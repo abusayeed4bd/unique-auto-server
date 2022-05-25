@@ -1,5 +1,6 @@
 const express = require('express')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const jwt = require('jsonwebtoken');
 
 const cors = require("cors");
 
@@ -29,6 +30,7 @@ async function run() {
 
         const productCollection = client.db('unique-auto').collection('products');
         const reviewCollection = client.db('unique-auto').collection('reviews');
+        const userCollection = client.db('unique-auto').collection('users');
 
         // product api
         app.get('/products', async (req, res) => {
@@ -66,6 +68,22 @@ async function run() {
             const result = await reviewCollection.insertOne(data);
             res.send(result);
         })
+
+
+        // users
+
+        app.put('/user/:email', async (req, res) => {
+            const email = req.params.email;
+            const user = req.body;
+            const filter = { email: email };
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: user,
+            };
+            const result = await userCollection.updateOne(filter, updateDoc, options);
+            const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            res.send({ result, token });
+        });
     } finally {
 
     }
