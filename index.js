@@ -2,12 +2,16 @@ const express = require('express')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 
+
+require("dotenv").config();
+
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 const cors = require("cors");
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-require("dotenv").config();
 
 app.use(cors());
 app.use(express.json());
@@ -32,6 +36,7 @@ async function run() {
         const reviewCollection = client.db('unique-auto').collection('reviews');
         const userCollection = client.db('unique-auto').collection('users');
         const orderCollection = client.db('unique-auto').collection('orders');
+        const paymentCollection = client.db('unique-auto').collection('payments');
 
         // custom function hooks
         const verifyAdmin = async (req, res, next) => {
@@ -44,16 +49,23 @@ async function run() {
                 res.status(403).send({ message: 'forbidden' });
             }
         }
-        const verifyUser = async (req, res, next) => {
-            const requester = req.decoded.email;
-            const requesterAccount = await userCollection.findOne({ email: requester });
-            if (!requesterAccount.role === 'admin') {
-                next();
-            }
-            else {
-                res.status(403).send({ message: 'forbidden' });
-            }
-        }
+        app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+            const { price } = req.body;
+
+            const amount = price * 100;
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                payment_method_types: [
+                    "card"
+                ],
+
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        })
 
 
         function verifyJWT(req, res, next) {
@@ -156,10 +168,39 @@ async function run() {
         })
         app.get('/orders/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
-            const q = { email: email };
-            const cursor = orderCollection.find(q);
-            const reviews = await cursor.toArray();
-            res.send(reviews);
+            const decodedEmail = req.decoded.email;
+            if (email == decodedEmail) {
+                const q = { email: email };
+                const cursor = orderCollection.find(q);
+                const orders = await cursor.toArray();
+                res.send(orders);
+            }
+            else {
+                res.status(403).send({ message: 'forbidded access' })
+            }
+        })
+
+        app.patch('/order/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const payment = req.body;
+            const filter = { _id: ObjectId(id) };
+            const updateDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId,
+                }
+            }
+            const result = paymentCollection.insertOne(payment);
+            const updatePayment = await orderCollection.updateOne(filter, updateDoc);
+            res.send(updateDoc)
+
+        })
+
+        app.get('/payment/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const q = { _id: ObjectId(id) }
+            const order = await orderCollection.findOne(q);
+            res.send(order);
         })
     } finally {
 
