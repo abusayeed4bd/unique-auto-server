@@ -195,6 +195,12 @@ async function run() {
             res.send(updateDoc)
 
         })
+        app.delete('/order/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const result = await orderCollection.deleteOne(filter);
+            res.send(result);
+        })
 
         app.get('/payment/:id', verifyJWT, async (req, res) => {
             const id = req.params.id;
