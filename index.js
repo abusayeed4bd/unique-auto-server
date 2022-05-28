@@ -128,6 +128,13 @@ async function run() {
             const users = await cursor.toArray();
             res.send(users);
         })
+        app.get('/user/:email', async (req, res) => {
+            const email = req.params.email;
+            const q = { email: email };
+            const user = await userCollection.findOne(q);
+
+            res.send(user);
+        })
 
         app.put('/user/:email', async (req, res) => {
             const email = req.params.email;
@@ -166,6 +173,18 @@ async function run() {
             const result = await orderCollection.insertOne(data);
             res.send(result);
         })
+        app.get('/orders', async (req, res) => {
+            const q = {};
+            const result = await orderCollection.find(q).toArray();
+            res.send(result);
+        })
+        app.delete('/product/:id', async (req, res) => {
+            const id = req.params.id;
+            const q = { _id: ObjectId(id) };
+            const result = await productCollection.deleteOne(q);
+            res.send(result);
+        })
+
         app.get('/orders/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
             const decodedEmail = req.decoded.email;
